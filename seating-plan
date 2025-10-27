@@ -228,6 +228,8 @@
             max-width: 1400px;
             margin: 2rem auto;
             padding: 0 1.5rem;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         /* Card */
@@ -237,6 +239,9 @@
             padding: 1.5rem;
             margin-bottom: 1.5rem;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .card-header {
@@ -371,6 +376,8 @@
             text-align: center;
             background: var(--light-gray);
             transition: all 0.3s;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .upload-area:hover {
@@ -389,6 +396,17 @@
             padding: 1rem;
             background: rgba(102, 126, 234, 0.1);
             border-radius: 8px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .upload-area details {
+            max-width: 100%;
+            overflow: hidden;
+        }
+        
+        .upload-area details ul {
+            text-align: left;
         }
 
         /* Venue List */
@@ -401,6 +419,8 @@
             border-radius: 8px;
             margin-bottom: 0.75rem;
             transition: all 0.3s;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .venue-item:hover {
@@ -410,17 +430,22 @@
         .venue-name {
             font-weight: 600;
             color: var(--deep-black);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .venue-details {
             font-size: 0.85rem;
             color: var(--dark-gray);
             margin-top: 0.25rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .venue-actions {
             display: flex;
             gap: 0.5rem;
+            flex-shrink: 0;
         }
 
         /* Combinations List */
@@ -432,6 +457,9 @@
             background: var(--light-gray);
             border-radius: 8px;
             margin-bottom: 0.5rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            gap: 1rem;
         }
 
         .combination-badge {
@@ -441,6 +469,9 @@
             font-size: 0.85rem;
             font-weight: 500;
             color: white;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
         }
 
         /* Seating Grid */
@@ -526,8 +557,22 @@
             max-width: 800px;
             max-height: 80vh;
             overflow-y: auto;
+            overflow-x: hidden;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
             animation: slideIn 0.3s;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .modal-content table {
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        
+        .modal-content p {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         @keyframes slideIn {
@@ -798,6 +843,34 @@
             .seating-stats {
                 flex-direction: column;
             }
+            
+            .modal-content {
+                width: 95%;
+                padding: 1rem;
+                margin: 10% auto;
+            }
+        }
+        
+        /* Details/Summary styles */
+        details {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        details summary {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        details ul {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        details li {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            margin-bottom: 0.5rem;
         }
 
         /* Print Styles */
@@ -2212,7 +2285,7 @@
         window.onbeforeunload = function() {
             return 'Are you sure you want to close? Unsaved changes will be lost.';
         };
-    </script>
+    <\/script>
 </body>
 </html>
             `;
@@ -2604,41 +2677,53 @@
             const sampleData = students.slice(0, sampleSize);
             
             let debugHTML = `
-                <div style="text-align: left; max-height: 400px; overflow-y: auto;">
-                    <h3>📊 Detected Student Data (First ${sampleSize} of ${students.length})</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.85rem;">
-                        <thead>
-                            <tr style="background: var(--aqua-teal); color: white;">
-                                <th style="padding: 0.5rem; border: 1px solid #ddd;">Student #</th>
-                                <th style="padding: 0.5rem; border: 1px solid #ddd;">Surname</th>
-                                <th style="padding: 0.5rem; border: 1px solid #ddd;">Name</th>
-                                <th style="padding: 0.5rem; border: 1px solid #ddd;">Grade</th>
-                                <th style="padding: 0.5rem; border: 1px solid #ddd;">Class</th>
-                                <th style="padding: 0.5rem; border: 1px solid #ddd;">Subject</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                <div style="text-align: left;">
+                    <h3 style="margin-bottom: 1rem;">📊 Detected Student Data</h3>
+                    <p style="margin-bottom: 1rem; color: var(--dark-gray);">
+                        Showing first ${sampleSize} of ${students.length} students
+                    </p>
+                    <div style="overflow-x: auto; max-width: 100%;">
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.85rem; min-width: 600px;">
+                            <thead>
+                                <tr style="background: var(--aqua-teal); color: white;">
+                                    <th style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">Student #</th>
+                                    <th style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">Surname</th>
+                                    <th style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">Name</th>
+                                    <th style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">Grade</th>
+                                    <th style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">Class</th>
+                                    <th style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">Subject</th>
+                                </tr>
+                            </thead>
+                            <tbody>
             `;
             
             sampleData.forEach(student => {
                 debugHTML += `
                     <tr>
-                        <td style="padding: 0.5rem; border: 1px solid #ddd;">${student.studentNumber || '❌ Missing'}</td>
-                        <td style="padding: 0.5rem; border: 1px solid #ddd;">${student.surname || '❌ Missing'}</td>
-                        <td style="padding: 0.5rem; border: 1px solid #ddd;">${student.name || '❌ Missing'}</td>
-                        <td style="padding: 0.5rem; border: 1px solid #ddd;">${student.grade || '❌ Missing'}</td>
-                        <td style="padding: 0.5rem; border: 1px solid #ddd;">${student.class || '❌ Missing'}</td>
-                        <td style="padding: 0.5rem; border: 1px solid #ddd;">${student.subject || '❌ Missing'}</td>
+                        <td style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">${student.studentNumber || '<span style="color: red;">❌ Missing</span>'}</td>
+                        <td style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">${student.surname || '<span style="color: red;">❌ Missing</span>'}</td>
+                        <td style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">${student.name || '<span style="color: red;">❌ Missing</span>'}</td>
+                        <td style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">${student.grade || '<span style="color: red;">❌ Missing</span>'}</td>
+                        <td style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">${student.class || '<span style="color: orange;">⚠️ Optional</span>'}</td>
+                        <td style="padding: 0.5rem; border: 1px solid #ddd; white-space: nowrap;">${student.subject || '<span style="color: red;">❌ Missing</span>'}</td>
                     </tr>
                 `;
             });
             
             debugHTML += `
-                        </tbody>
-                    </table>
-                    <p style="margin-top: 1rem; color: var(--dark-gray); font-size: 0.85rem;">
-                        ℹ️ If you see "❌ Missing" values, please check your Excel file column names.
-                    </p>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 1rem; padding: 1rem; background: #f0f0f0; border-radius: 8px;">
+                        <p style="color: var(--dark-gray); font-size: 0.85rem; margin-bottom: 0.5rem;">
+                            <strong>ℹ️ Key:</strong>
+                        </p>
+                        <ul style="font-size: 0.85rem; color: var(--dark-gray); margin-left: 1.5rem;">
+                            <li><span style="color: red;">❌ Missing</span> = Required field not detected</li>
+                            <li><span style="color: orange;">⚠️ Optional</span> = Field is optional</li>
+                            <li>If you see missing required fields, check your Excel column names</li>
+                        </ul>
+                    </div>
                 </div>
             `;
             
