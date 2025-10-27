@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invigilation Scheduler</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDk0WZdFVImwinLFNYj8SSghLcxC_SDAp8",
+            authDomain: "edu-clicklab.firebaseapp.com",
+            projectId: "edu-clicklab",
+            storageBucket: "edu-clicklab.firebasestorage.app",
+            messagingSenderId: "1029624910209",
+            appId: "1:1029624910209:web:20a3b9664fca69b7b21880",
+            measurementId: "G-6DMZ7QTWGM"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make Firebase available globally FIRST
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.firebaseReady = false;
+        window.currentFirebaseUser = null;
+
+        // Check if user is authenticated
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.href = 'index.html';
+            } else {
+                window.currentFirebaseUser = user;
+                window.firebaseReady = true;
+                // Dispatch event to notify React component
+                window.dispatchEvent(new CustomEvent('firebaseReady'));
+            }
+        });
+
+        // Save data to Firestore
+        window.saveToFirebase = async function(collectionName, data) {
+            const user = auth.currentUser || window.currentFirebaseUser;
+            if (!user) {
+                console.log('⏳ Waiting for user authentication...');
+                return false;
+            }
+
+            try {
+                await setDoc(doc(db, collectionName, user.uid), {
+                    data: data,
+                    lastUpdated: new Date().toISOString()
+                });
+                console.log('✅ Data saved to Firebase successfully');
+                return true;
+            } catch (error) {
+                console.error('❌ Error saving to Firebase:', error);
+                return false;
+            }
+        };
+
+        // Load data from Firestore
+        window.loadFromFirebase = async function(collectionName) {
+            const user = auth.currentUser || window.currentFirebaseUser;
+            if (!user) {
+                console.log('⏳ Waiting for user authentication...');
+                return null;
+            }
+
+            try {
+                const docRef = doc(db, collectionName, user.uid);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    console.log('✅ Data loaded from Firebase successfully');
+                    return docSnap.data().data;
+                } else {
+                    console.log('ℹ️ No saved data found in Firebase');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error loading from Firebase:', error);
+                return null;
+            }
+        };
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
+            color: #000000;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: #FFFFFF; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 12px; 
+            font-weight: 600; 
+            font-size: 16px; 
+            cursor: pointer; 
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        .btn-primary:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary { 
+            background: #626567; 
+            color: #FFFFFF; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 12px; 
+            font-weight: 600; 
+            font-size: 16px; 
+            cursor: pointer; 
+            transition: all 0.3s;
+        }
+        .btn-secondary:hover { background: #4a4d4f; }
+        .btn-edit {
+            background: #FFA500;
+            color: #FFFFFF;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+        .btn-edit:hover { background: #FF8C00; }
+        .card { 
+            background: #FFFFFF; 
+            border-radius: 16px; 
+            padding: 24px; 
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            margin-bottom: 24px;
+        }
+        .card-alt { background: #F5F5F5; }
+        .input-field {
+            padding: 10px 12px;
+            border: 1px solid #D1D3D4;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            width: 100%;
+        }
+        .input-field:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        .time-input {
+            padding: 4px 8px;
+            border: 1px solid #D1D3D4;
+            border-radius: 6px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            width: 70px;
+            text-align: center;
+        }
+        .time-input:focus { outline: none; border-color: #667eea; }
+        .tag { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: #FFFFFF; 
+            padding: 6px 12px; 
+            border-radius: 8px; 
+            font-size: 13px; 
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .text-secondary { color: #626567; }
+        .divider { border-bottom: 1px solid #D1D3D4; margin: 16px 0; }
+        .header-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #FFFFFF;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+        }
+        .btn-home {
+            background: rgba(255, 255, 255, 0.2);
+            color: #FFFFFF;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        .btn-home:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .user-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: #FFFFFF;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-badge {
+            background: rgba(255, 255, 255, 0.25);
+            color: #FFFFFF;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .editable-time {
+            background: #F0F3FF;
+            border: 1px dashed #667eea;
+            padding: 2px 4px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .editable-time:hover {
+            background: #E6EBFF;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Version Manager Styles */
+        .version-manager-bar {
+            background: #FFFFFF;
+            border-bottom: 2px solid #e0e0e0;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .version-manager-bar label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .version-tabs {
+            display: flex;
+            gap: 0.5rem;
+            flex: 1;
+            overflow-x: auto;
+            padding: 0.25rem 0;
+        }
+        
+        .version-tab {
+            background: #f5f5f5;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 14px;
+        }
+        
+        .version-tab:hover {
+            background: #e8e8e8;
+        }
+        
+        .version-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .version-tab-close {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 0.5rem;
+            opacity: 0.7;
+        }
+        
+        .version-tab-close:hover {
+            opacity: 1;
+        }
+        
+        .add-version-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+        
+        .add-version-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+        
+        .modal-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .modal-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+        
+        /* Logo Styles */
+        .header-logo {
+            height: 300px;
+            width: auto;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 12px;
+        }
+        
+        .header-title-container {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const InvigilationScheduler = () => {
+          const [invigilators, setInvigilators] = useState([]);
+          const [days, setDays] = useState([]);
+          const [schedule, setSchedule] = useState(null);
+          const [newInvigilatorName, setNewInvigilatorName] = useState('');
+          const [newInvigilatorAvail, setNewInvigilatorAvail] = useState(100);
+          const [viewMode, setViewMode] = useState('list');
+          const [editingSession, setEditingSession] = useState(null);
+          const [notifications, setNotifications] = useState([]);
+          const [confirmDialog, setConfirmDialog] = useState(null);
+          const [scheduleCollapsed, setScheduleCollapsed] = useState(false);
+          
+          // Version Management
+          const [versions, setVersions] = useState({});
+          const [currentVersionId, setCurrentVersionId] = useState(null);
+          const [showVersionModal, setShowVersionModal] = useState(false);
+          const [versionModalAction, setVersionModalAction] = useState('create');
+          const [versionModalValue, setVersionModalValue] = useState('');
+
+          const showNotification = (message, type = 'info') => {
+            const id = Date.now();
+            setNotifications(prev => [...prev, { id, message, type }]);
+            setTimeout(() => {
+              setNotifications(prev => prev.filter(n => n.id !== id));
+            }, 4000);
+          };
+
+          const showConfirm = (message, onConfirm) => {
+            setConfirmDialog({ message, onConfirm });
+          };
+
+          const handleConfirm = (confirmed) => {
+            if (confirmed && confirmDialog.onConfirm) {
+              confirmDialog.onConfirm();
+            }
+            setConfirmDialog(null);
+          };
+
+          // Version Management Functions
+          const generateVersionId = () => {
+            return 'version_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          };
+
+          const createNewVersion = () => {
+            if (!versionModalValue.trim()) {
+              showNotification('Please enter a version name', 'error');
+              return;
+            }
+
+            const versionId = generateVersionId();
+            const newVersion = {
+              id: versionId,
+              name: versionModalValue.trim(),
+              invigilators: [],
+              days: [],
+              schedule: null,
+              createdAt: new Date().toISOString()
+            };
+
+            setVersions(prev => ({ ...prev, [versionId]: newVersion }));
+            setCurrentVersionId(versionId);
+            setInvigilators([]);
+            setDays([]);
+            setSchedule(null);
+            setShowVersionModal(false);
+            setVersionModalValue('');
+            showNotification(`Version "${newVersion.name}" created!`, 'success');
+          };
+
+          const renameVersion = () => {
+            if (!versionModalValue.trim()) {
+              showNotification('Please enter a version name', 'error');
+              return;
+            }
+
+            setVersions(prev => ({
+              ...prev,
+              [currentVersionId]: {
+                ...prev[currentVersionId],
+                name: versionModalValue.trim()
+              }
+            }));
+            setShowVersionModal(false);
+            setVersionModalValue('');
+            showNotification('Version renamed!', 'success');
+          };
+
+          const switchVersion = (versionId) => {
+            if (versionId === currentVersionId) return;
+
+            // Save current version data
+            if (currentVersionId && versions[currentVersionId]) {
+              setVersions(prev => ({
+                ...prev,
+                [currentVersionId]: {
+                  ...prev[currentVersionId],
+                  invigilators,
+                  days,
+                  schedule
+                }
+              }));
+            }
+
+            // Load new version data
+            const version = versions[versionId];
+            setCurrentVersionId(versionId);
+            setInvigilators(version.invigilators || []);
+            setDays(version.days || []);
+            setSchedule(version.schedule || null);
+            showNotification(`Switched to "${version.name}"`, 'success');
+          };
+
+          const deleteVersion = (versionId, e) => {
+            e.stopPropagation();
+            
+            if (Object.keys(versions).length <= 1) {
+              showNotification('Cannot delete the last version', 'error');
+              return;
+            }
+
+            const versionName = versions[versionId].name;
+            showConfirm(`Are you sure you want to delete "${versionName}"?`, () => {
+              const newVersions = { ...versions };
+              delete newVersions[versionId];
+              setVersions(newVersions);
+
+              if (currentVersionId === versionId) {
+                const firstVersionId = Object.keys(newVersions)[0];
+                switchVersion(firstVersionId);
+              }
+              
+              showNotification(`Version "${versionName}" deleted`, 'success');
+            });
+          };
+
+          const openCreateVersionModal = () => {
+            setVersionModalAction('create');
+            setVersionModalValue('');
+            setShowVersionModal(true);
+          };
+
+          const openRenameVersionModal = () => {
+            if (!currentVersionId) return;
+            setVersionModalAction('rename');
+            setVersionModalValue(versions[currentVersionId]?.name || '');
+            setShowVersionModal(true);
+          };
+
+          const closeVersionModal = () => {
+            setShowVersionModal(false);
+            setVersionModalValue('');
+          };
+
+          const handleVersionModalSubmit = () => {
+            if (versionModalAction === 'create') {
+              createNewVersion();
+            } else if (versionModalAction === 'rename') {
+              renameVersion();
+            }
+          };
+
+          useEffect(() => {
+            // Load data from Firebase on component mount
+            const loadData = async () => {
+              try {
+                if (window.loadFromFirebase) {
+                  const data = await window.loadFromFirebase('invigilation_scheduler');
+                  if (data && data.versions) {
+                    // Load versions
+                    setVersions(data.versions);
+                    
+                    // Load current version
+                    const versionId = data.currentVersionId || Object.keys(data.versions)[0];
+                    setCurrentVersionId(versionId);
+                    
+                    if (versionId && data.versions[versionId]) {
+                      const version = data.versions[versionId];
+                      setInvigilators(version.invigilators || []);
+                      setDays(version.days || []);
+                      setSchedule(version.schedule || null);
+                      showNotification(`Loaded version "${version.name}"`, 'success');
+                    }
+                    console.log('✅ All versions loaded from Firebase');
+                  } else {
+                    // Create default version if none exist
+                    const defaultVersionId = generateVersionId();
+                    const defaultVersion = {
+                      id: defaultVersionId,
+                      name: 'Default Schedule',
+                      invigilators: [],
+                      days: [],
+                      schedule: null,
+                      createdAt: new Date().toISOString()
+                    };
+                    setVersions({ [defaultVersionId]: defaultVersion });
+                    setCurrentVersionId(defaultVersionId);
+                    console.log('ℹ️ No saved data found, created default version');
+                  }
+                }
+              } catch (error) {
+                console.error('❌ Error loading data:', error);
+              }
+            };
+            
+            // Wait for Firebase to be ready
+            if (window.firebaseReady) {
+              loadData();
+            } else {
+              const handleFirebaseReady = () => {
+                loadData();
+              };
+              window.addEventListener('firebaseReady', handleFirebaseReady);
+              return () => window.removeEventListener('firebaseReady', handleFirebaseReady);
+            }
+          }, []);
+
+          useEffect(() => {
+            // Auto-save to Firebase whenever data changes (with debouncing)
+            const saveData = async () => {
+              if (!window.firebaseReady) {
+                console.log('⏳ Firebase not ready, will retry...');
+                return;
+              }
+              
+              // Update current version with latest data
+              const updatedVersions = {
+                ...versions,
+                [currentVersionId]: {
+                  ...versions[currentVersionId],
+                  invigilators,
+                  days,
+                  schedule
+                }
+              };
+              
+              try {
+                const success = await window.saveToFirebase('invigilation_scheduler', {
+                  versions: updatedVersions,
+                  currentVersionId
+                });
+                if (success) {
+                  console.log('✅ Auto-save completed');
+                }
+              } catch (error) {
+                console.error('❌ Error auto-saving data:', error);
+              }
+            };
+            
+            // Debounce saves to avoid too many writes
+            const timeoutId = setTimeout(() => {
+              if (currentVersionId && (invigilators.length > 0 || days.length > 0 || schedule)) {
+                saveData();
+              }
+            }, 1500); // Slightly longer delay for better batching
+            
+            return () => clearTimeout(timeoutId);
+          }, [invigilators, days, schedule, versions, currentVersionId]);
+
+          const addInvigilator = () => {
+            if (newInvigilatorName.trim()) {
+              setInvigilators([...invigilators, { name: newInvigilatorName.trim(), availability: newInvigilatorAvail }]);
+              setNewInvigilatorName('');
+              setNewInvigilatorAvail(100);
+            }
+          };
+
+          const removeInvigilator = (index) => {
+            setInvigilators(invigilators.filter((_, i) => i !== index));
+          };
+
+          const updateInvigilator = (index, field, value) => {
+            const updated = [...invigilators];
+            if (field === 'availability') {
+              updated[index][field] = Number(value);
+            } else {
+              updated[index][field] = typeof value === 'string' ? value.trim() : value;
+            }
+            setInvigilators(updated);
+          };
+
+          const addDay = () => {
+            const today = new Date().toISOString().split('T')[0];
+            setDays([...days, { 
+              date: today, subject: '', venue: '', grade: '', startTime: '09:00', duration: 2.5,
+              shifts: 2, invigilatorsPerShift: 2, excludedInvigilators: [] 
+            }]);
+          };
+
+          const removeDay = (index) => {
+            setDays(days.filter((_, i) => i !== index));
+          };
+
+          const updateDay = (index, field, value) => {
+            const updated = [...days];
+            if (field === 'excludedInvigilators') {
+              updated[index][field] = value;
+            } else if (field === 'date' || field === 'subject' || field === 'startTime' || field === 'venue' || field === 'grade') {
+              updated[index][field] = typeof value === 'string' ? value.trim() : value;
+            } else if (field === 'duration') {
+              updated[index][field] = parseFloat(value);
+            } else {
+              updated[index][field] = Number(value);
+            }
+            setDays(updated);
+          };
+
+          const toggleExcludedInvigilator = (dayIndex, invigilatorName) => {
+            const updated = [...days];
+            const excluded = updated[dayIndex].excludedInvigilators;
+            if (excluded.includes(invigilatorName)) {
+              updated[dayIndex].excludedInvigilators = excluded.filter(name => name !== invigilatorName);
+            } else {
+              updated[dayIndex].excludedInvigilators = [...excluded, invigilatorName];
+            }
+            setDays(updated);
+          };
+
+          const calculateShiftTimes = (startTime, duration, totalShifts, shiftNumber) => {
+            const [hours, minutes] = startTime.split(':').map(Number);
+            const startMinutes = hours * 60 + minutes;
+            const durationMinutes = duration * 60;
+            const endMinutes = startMinutes + durationMinutes;
+            const shiftDuration = durationMinutes / totalShifts;
+            const shiftStartMinutes = startMinutes + (shiftNumber - 1) * shiftDuration;
+            const shiftEndMinutes = shiftNumber === totalShifts ? endMinutes : shiftStartMinutes + shiftDuration;
+            const formatTime = (mins) => {
+              const h = Math.floor(mins / 60);
+              const m = Math.round(mins % 60);
+              return h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
+            };
+            return { start: formatTime(shiftStartMinutes), end: formatTime(shiftEndMinutes) };
+          };
+
+          const updateShiftTime = (dayIndex, shiftIndex, field, newTime) => {
+            const updatedSchedule = { ...schedule };
+            updatedSchedule.schedule[dayIndex].shifts[shiftIndex][field] = newTime;
+            setSchedule(updatedSchedule);
+            showNotification(`${field === 'startTime' ? 'Start' : 'End'} time updated successfully`, 'success');
+          };
+
+          const startEditingTimes = (dayIndex, shiftIndex) => {
+            setEditingTimes({ dayIndex, shiftIndex });
+          };
+
+          const finishEditingTimes = () => {
+            setEditingTimes(null);
+          };
+
+          const generateSchedule = () => {
+            if (invigilators.length === 0) { showNotification('Please add invigilators first!', 'error'); return; }
+            if (days.length === 0) { showNotification('Please add invigilation days first!', 'error'); return; }
+            const availableInvigilators = invigilators.filter(t => t.availability > 0);
+            
+            const totalSlots = days.reduce((sum, day) => sum + (day.shifts * day.invigilatorsPerShift), 0);
+            const totalWeight = availableInvigilators.reduce((sum, t) => sum + t.availability, 0);
+            const invigilatorTargets = availableInvigilators.map(t => ({
+              name: t.name, availability: t.availability,
+              targetSlots: (t.availability / totalWeight) * totalSlots,
+              assignedSlots: 0, assignments: []
+            }));
+
+            const newSchedule = [];
+            const warnings = [];
+            let backToBackUsed = 0;
+            
+            // Sort days by date
+            const sortedDays = [...days].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            sortedDays.forEach((day, dayIndex) => {
+              const daySchedule = { 
+                date: day.date, subject: day.subject, venue: day.venue,
+                startTime: day.startTime, duration: day.duration, shifts: [] 
+              };
+              
+              for (let shiftNum = 1; shiftNum <= day.shifts; shiftNum++) {
+                const shiftInvigilators = [];
+                const shiftTimes = calculateShiftTimes(day.startTime, day.duration, day.shifts, shiftNum);
+                
+                const checkTimeConflict = (invigilator, date, startTime, endTime) => {
+                  return invigilator.assignments.some(assignment => {
+                    if (assignment.date !== date) return false;
+                    return !(endTime <= assignment.startTime || startTime >= assignment.endTime);
+                  });
+                };
+                
+                const checkBackToBack = (invigilator, dayIdx, shiftN) => {
+                  return invigilator.assignments.some(assignment => 
+                    assignment.dayIndex === dayIdx && assignment.shiftNum === shiftN - 1
+                  );
+                };
+                
+                const eligibleInvigilators = invigilatorTargets.filter(t => {
+                  if (day.excludedInvigilators.includes(t.name)) return false;
+                  if (checkTimeConflict(t, day.date, shiftTimes.start, shiftTimes.end)) return false;
+                  if (checkBackToBack(t, dayIndex, shiftNum)) return false;
+                  return true;
+                });
+
+                eligibleInvigilators.sort((a, b) => (b.targetSlots - b.assignedSlots) - (a.targetSlots - a.assignedSlots));
+
+                for (let i = 0; i < day.invigilatorsPerShift && i < eligibleInvigilators.length; i++) {
+                  const invigilator = eligibleInvigilators[i];
+                  shiftInvigilators.push(invigilator.name);
+                  invigilator.assignedSlots++;
+                  invigilator.assignments.push({
+                    date: day.date, dayIndex, shiftNum,
+                    startTime: shiftTimes.start, endTime: shiftTimes.end,
+                    venue: day.venue, subject: day.subject
+                  });
+                }
+                
+                if (shiftInvigilators.length < day.invigilatorsPerShift) {
+                  const fallbackInvigilators = invigilatorTargets.filter(t => {
+                    if (day.excludedInvigilators.includes(t.name)) return false;
+                    if (checkTimeConflict(t, day.date, shiftTimes.start, shiftTimes.end)) return false;
+                    if (shiftInvigilators.includes(t.name)) return false;
+                    return true;
+                  });
+                  fallbackInvigilators.sort((a, b) => (b.targetSlots - b.assignedSlots) - (a.targetSlots - a.assignedSlots));
+                  for (let i = 0; i < day.invigilatorsPerShift - shiftInvigilators.length && i < fallbackInvigilators.length; i++) {
+                    const invigilator = fallbackInvigilators[i];
+                    shiftInvigilators.push(invigilator.name);
+                    invigilator.assignedSlots++;
+                    invigilator.assignments.push({
+                      date: day.date, dayIndex, shiftNum,
+                      startTime: shiftTimes.start, endTime: shiftTimes.end,
+                      venue: day.venue, subject: day.subject
+                    });
+                    backToBackUsed++;
+                    warnings.push('Back-to-back: ' + invigilator.name + ' on ' + day.date + ' at ' + day.venue);
+                  }
+                }
+                
+                if (shiftInvigilators.length < day.invigilatorsPerShift) {
+                  const shortage = day.invigilatorsPerShift - shiftInvigilators.length;
+                  warnings.push('SHORTAGE: ' + shortage + ' invigilator(s) needed for ' + day.date + ' ' + day.subject + ' Session ' + shiftNum + ' at ' + day.venue);
+                }
+
+                daySchedule.shifts.push({
+                  shiftNumber: shiftNum, invigilators: shiftInvigilators,
+                  startTime: shiftTimes.start, endTime: shiftTimes.end
+                });
+              }
+              newSchedule.push(daySchedule);
+            });
+
+            const stats = invigilatorTargets.map(t => ({
+              name: t.name, availability: t.availability,
+              targetSlots: t.targetSlots.toFixed(2), assignedSlots: t.assignedSlots,
+              difference: (t.assignedSlots - t.targetSlots).toFixed(2)
+            }));
+
+            setSchedule({ schedule: newSchedule, stats, warnings, backToBackCount: backToBackUsed });
+            showNotification('Schedule generated successfully!', 'success');
+          };
+
+          const clearForm = () => {
+            showConfirm('Clear all data? This cannot be undone.', () => {
+              setInvigilators([]);
+              setDays([]);
+              setSchedule(null);
+              localStorage.removeItem('invigilation_invigilators');
+              localStorage.removeItem('invigilation_days');
+              showNotification('All data cleared successfully', 'success');
+            });
+          };
+
+          const removeInvigilatorFromSession = (dayIndex, shiftIndex, invigilatorName) => {
+            const updatedSchedule = { ...schedule };
+            updatedSchedule.schedule[dayIndex].shifts[shiftIndex].invigilators = 
+              updatedSchedule.schedule[dayIndex].shifts[shiftIndex].invigilators.filter(t => t !== invigilatorName);
+            setSchedule(updatedSchedule);
+          };
+
+          const addInvigilatorToSession = (dayIndex, shiftIndex, invigilatorName) => {
+            const updatedSchedule = { ...schedule };
+            if (!updatedSchedule.schedule[dayIndex].shifts[shiftIndex].invigilators.includes(invigilatorName)) {
+              updatedSchedule.schedule[dayIndex].shifts[shiftIndex].invigilators.push(invigilatorName);
+            }
+            setSchedule(updatedSchedule);
+            setEditingSession(null);
+          };
+
+          const recheckWarnings = () => {
+            if (!schedule) return;
+            
+            const warnings = [];
+            let backToBackUsed = 0;
+            const invigilatorAssignments = {};
+            
+            schedule.schedule.forEach((day, dayIndex) => {
+              day.shifts.forEach((shift, shiftIndex) => {
+                shift.invigilators.forEach(invigilator => {
+                  if (!invigilatorAssignments[invigilator]) {
+                    invigilatorAssignments[invigilator] = [];
+                  }
+                  invigilatorAssignments[invigilator].push({
+                    date: day.date,
+                    dayIndex: dayIndex,
+                    shiftNum: shiftIndex + 1,
+                    startTime: shift.startTime,
+                    endTime: shift.endTime,
+                    venue: day.venue,
+                    subject: day.subject
+                  });
+                });
+                
+                const requiredInvigilators = days[dayIndex]?.invigilatorsPerShift || 2;
+                if (shift.invigilators.length < requiredInvigilators) {
+                  const shortage = requiredInvigilators - shift.invigilators.length;
+                  warnings.push('SHORTAGE: ' + shortage + ' invigilator(s) needed for ' + day.date + ' ' + day.subject + ' Session ' + shift.shiftNumber + ' at ' + day.venue);
+                }
+              });
+            });
+            
+            Object.keys(invigilatorAssignments).forEach(invigilator => {
+              const assignments = invigilatorAssignments[invigilator];
+              
+              for (let i = 0; i < assignments.length; i++) {
+                for (let j = i + 1; j < assignments.length; j++) {
+                  const a1 = assignments[i];
+                  const a2 = assignments[j];
+                  
+                  if (a1.date === a2.date) {
+                    if (!(a2.startTime >= a1.endTime || a2.endTime <= a1.startTime)) {
+                      warnings.push('TIME CONFLICT: ' + invigilator + ' has overlapping sessions on ' + a1.date + ' at ' + a1.venue + ' and ' + a2.venue);
+                    }
+                    
+                    if (a1.dayIndex === a2.dayIndex && Math.abs(a1.shiftNum - a2.shiftNum) === 1) {
+                      backToBackUsed++;
+                      warnings.push('Back-to-back: ' + invigilator + ' on ' + a1.date + ' at ' + a1.venue);
+                    }
+                  }
+                }
+              }
+            });
+            
+            const updatedSchedule = { ...schedule, warnings, backToBackCount: backToBackUsed };
+            setSchedule(updatedSchedule);
+            showNotification('Warnings rechecked! Found ' + warnings.length + ' issue(s).', warnings.length > 0 ? 'error' : 'success');
+          };
+
+          // NEW: Export complete schedule as JSON
+          const exportScheduleJSON = () => {
+            if (!schedule) {
+              showNotification('No schedule to export!', 'error');
+              return;
+            }
+            const scheduleData = {
+              schedule: schedule,
+              invigilators: invigilators,
+              days: days,
+              exportDate: new Date().toISOString()
+            };
+            const jsonString = JSON.stringify(scheduleData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'invigilation-schedule-complete.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            showNotification('Schedule exported successfully! You can re-upload this file to continue editing.', 'success');
+          };
+
+          // NEW: Import complete schedule from JSON
+          const importScheduleJSON = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const scheduleData = JSON.parse(event.target.result);
+                if (scheduleData.schedule && scheduleData.invigilators && scheduleData.days) {
+                  setSchedule(scheduleData.schedule);
+                  setInvigilators(scheduleData.invigilators);
+                  setDays(scheduleData.days);
+                  showNotification('Schedule imported successfully! You can now continue editing.', 'success');
+                } else {
+                  showNotification('Invalid schedule file format!', 'error');
+                }
+                e.target.value = '';
+              } catch (error) {
+                showNotification('Error importing schedule: ' + error.message, 'error');
+                e.target.value = '';
+              }
+            };
+            reader.readAsText(file);
+          };
+
+          // NEW: Check if teacher has time conflict
+          const hasTimeConflict = (invigilatorName, targetDayIndex, targetShiftIndex) => {
+            if (!schedule) return false;
+            
+            const targetDay = schedule.schedule[targetDayIndex];
+            const targetShift = targetDay.shifts[targetShiftIndex];
+            const targetDate = targetDay.date;
+            const targetStart = targetShift.startTime;
+            const targetEnd = targetShift.endTime;
+            
+            // Check all other shifts for this invigilator
+            for (let dayIndex = 0; dayIndex < schedule.schedule.length; dayIndex++) {
+              const day = schedule.schedule[dayIndex];
+              if (day.date !== targetDate) continue; // Only check same day
+              
+              for (let shiftIndex = 0; shiftIndex < day.shifts.length; shiftIndex++) {
+                // Skip the target shift itself
+                if (dayIndex === targetDayIndex && shiftIndex === targetShiftIndex) continue;
+                
+                const shift = day.shifts[shiftIndex];
+                if (shift.invigilators.includes(invigilatorName)) {
+                  // Check for time overlap
+                  const shiftStart = shift.startTime;
+                  const shiftEnd = shift.endTime;
+                  
+                  // Times overlap if NOT (one ends before other starts OR one starts after other ends)
+                  if (!(targetEnd <= shiftStart || targetStart >= shiftEnd)) {
+                    return true; // Time conflict found
+                  }
+                }
+              }
+            }
+            
+            return false;
+          };
+
+          const exportSchedule = () => {
+            if (!schedule) return;
+            const wb = XLSX.utils.book_new();
+            const scheduleData = [['INVIGILATION SCHEDULE'], [''], ['Date', 'Subject', 'Venue', 'Start Time', 'Duration', 'Session', 'Time Slot', 'Invigilators']];
+            schedule.schedule.forEach(day => {
+              day.shifts.forEach(shift => {
+                scheduleData.push([day.date, day.subject, day.venue, day.startTime, day.duration + ' hrs',
+                  'Session ' + shift.shiftNumber, shift.startTime + ' - ' + shift.endTime, shift.invigilators.join(', ')]);
+              });
+            });
+            const wsSchedule = XLSX.utils.aoa_to_sheet(scheduleData);
+            XLSX.utils.book_append_sheet(wb, wsSchedule, 'Full Schedule');
+            
+            const invigilatorSchedules = {};
+            schedule.schedule.forEach(day => {
+              day.shifts.forEach(shift => {
+                shift.invigilators.forEach(invigilator => {
+                  if (!invigilatorSchedules[invigilator]) {
+                    invigilatorSchedules[invigilator] = [];
+                  }
+                  invigilatorSchedules[invigilator].push({
+                    date: day.date,
+                    subject: day.subject,
+                    venue: day.venue,
+                    shift: shift.shiftNumber,
+                    timeSlot: shift.startTime + ' - ' + shift.endTime
+                  });
+                });
+              });
+            });
+            
+            const individualData = [['INDIVIDUAL INVIGILATOR SCHEDULES'], [''], ['Invigilator', 'Date', 'Subject', 'Venue', 'Session', 'Time Slot']];
+            Object.keys(invigilatorSchedules).sort().forEach(invigilator => {
+              invigilatorSchedules[invigilator].forEach((slot, index) => {
+                individualData.push([
+                  index === 0 ? invigilator : '',
+                  slot.date,
+                  slot.subject,
+                  slot.venue,
+                  'Session ' + slot.shift,
+                  slot.timeSlot
+                ]);
+              });
+              individualData.push(['', '', '', '', '', '']);
+            });
+            
+            const wsIndividual = XLSX.utils.aoa_to_sheet(individualData);
+            XLSX.utils.book_append_sheet(wb, wsIndividual, 'Invigilator Schedules');
+            
+            const statsData = [['INVIGILATOR STATISTICS'], [''], ['Invigilator', 'Availability %', 'Target Slots', 'Assigned Slots', 'Difference']];
+            schedule.stats.forEach(stat => {
+              statsData.push([stat.name, stat.availability, parseFloat(stat.targetSlots), stat.assignedSlots, parseFloat(stat.difference)]);
+            });
+            const wsStats = XLSX.utils.aoa_to_sheet(statsData);
+            XLSX.utils.book_append_sheet(wb, wsStats, 'Statistics');
+            
+            if (schedule.warnings && schedule.warnings.length > 0) {
+              const warningsData = [['SCHEDULING WARNINGS'], ['']];
+              if (schedule.backToBackCount > 0) {
+                warningsData.push(['Back-to-back sessions used: ' + schedule.backToBackCount]);
+                warningsData.push(['']);
+              }
+              warningsData.push(['Warning Details']);
+              schedule.warnings.forEach(warning => warningsData.push([warning]));
+              const wsWarnings = XLSX.utils.aoa_to_sheet(warningsData);
+              XLSX.utils.book_append_sheet(wb, wsWarnings, 'Warnings');
+            }
+            XLSX.writeFile(wb, 'invigilation-schedule.xlsx');
+            showNotification('Excel schedule exported successfully!', 'success');
+          };
+
+          const exportCalendarInvites = () => {
+            if (!schedule) return;
+            
+            const invigilatorSchedules = {};
+            schedule.schedule.forEach(day => {
+              day.shifts.forEach(shift => {
+                shift.invigilators.forEach(invigilator => {
+                  if (!invigilatorSchedules[invigilator]) {
+                    invigilatorSchedules[invigilator] = [];
+                  }
+                  invigilatorSchedules[invigilator].push({
+                    date: day.date,
+                    subject: day.subject,
+                    venue: day.venue,
+                    grade: day.grade || '',
+                    startTime: shift.startTime,
+                    endTime: shift.endTime,
+                    shiftNumber: shift.shiftNumber
+                  });
+                });
+              });
+            });
+            
+            const invigilatorNames = Object.keys(invigilatorSchedules);
+            const totalInvigilators = invigilatorNames.length;
+            
+            if (totalInvigilators === 0) {
+              showNotification('No invigilators found in schedule!', 'error');
+              return;
+            }
+            
+            showNotification(`Starting calendar invite generation for ${totalInvigilators} invigilators. Please wait...`, 'info');
+            
+            // Function to download one invite at a time with delay
+            const downloadInvite = (index) => {
+              if (index >= invigilatorNames.length) {
+                showNotification(`Calendar invites generated for all ${totalInvigilators} invigilators!`, 'success');
+                return;
+              }
+              
+              const invigilator = invigilatorNames[index];
+              let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Invigilation Scheduler//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
+              
+              invigilatorSchedules[invigilator].forEach((session, sessionIndex) => {
+                const eventDate = session.date.replace(/-/g, '');
+                const startTime = session.startTime.replace(':', '') + '00';
+                const endTime = session.endTime.replace(':', '') + '00';
+                const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                
+                icsContent += 'BEGIN:VEVENT\n';
+                icsContent += 'UID:invigilation-' + invigilator.replace(/\s/g, '-') + '-' + sessionIndex + '-' + timestamp + '\n';
+                icsContent += 'DTSTAMP:' + timestamp + '\n';
+                icsContent += 'DTSTART:' + eventDate + 'T' + startTime + '\n';
+                icsContent += 'DTEND:' + eventDate + 'T' + endTime + '\n';
+                icsContent += 'SUMMARY:Invigilation - ' + session.subject + (session.grade ? ' (' + session.grade + ')' : '') + '\n';
+                icsContent += 'DESCRIPTION:Invigilation duty for ' + session.subject + (session.grade ? ' (' + session.grade + ')' : '') + ' (Session ' + session.shiftNumber + ')\\nTime: ' + session.startTime + ' - ' + session.endTime + '\n';
+                icsContent += 'LOCATION:' + session.venue + '\n';
+                icsContent += 'STATUS:CONFIRMED\n';
+                icsContent += 'BEGIN:VALARM\n';
+                icsContent += 'TRIGGER:-PT30M\n';
+                icsContent += 'DESCRIPTION:Invigilation duty in 30 minutes\n';
+                icsContent += 'ACTION:DISPLAY\n';
+                icsContent += 'END:VALARM\n';
+                icsContent += 'END:VEVENT\n';
+              });
+              
+              icsContent += 'END:VCALENDAR';
+              
+              const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = invigilator.replace(/\s/g, '_') + '_Invigilation_Schedule.ics';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(link.href);
+              
+              // Show progress notification
+              if ((index + 1) % 5 === 0 || index === invigilatorNames.length - 1) {
+                showNotification(`Downloaded ${index + 1} of ${totalInvigilators} calendar invites...`, 'info');
+              }
+              
+              // Wait 500ms before downloading next invite to avoid browser limitations
+              setTimeout(() => {
+                downloadInvite(index + 1);
+              }, 500);
+            };
+            
+            // Start the download process
+            downloadInvite(0);
+          };
+
+          const exportToPDF = () => {
+            if (!schedule) return;
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape');
+            
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text('INVIGILATION SCHEDULE', 14, 20);
+            
+            if (schedule.warnings && schedule.warnings.length > 0) {
+              doc.setFontSize(12);
+              doc.setTextColor(184, 134, 11);
+              doc.text('⚠ Warnings: ' + schedule.warnings.length + ' issue(s) detected', 14, 30);
+              doc.setTextColor(0, 0, 0);
+            }
+            
+            doc.setFontSize(14);
+            doc.text('Full Schedule', 14, 40);
+            
+            const scheduleTableData = [];
+            schedule.schedule.forEach(day => {
+              day.shifts.forEach(shift => {
+                scheduleTableData.push([
+                  day.date, day.subject, day.venue, day.startTime, day.duration + ' hrs',
+                  'Session ' + shift.shiftNumber, shift.startTime + ' - ' + shift.endTime, shift.invigilators.join(', ')
+                ]);
+              });
+            });
+            
+            doc.autoTable({
+              startY: 45,
+              head: [['Date', 'Subject', 'Venue', 'Start', 'Duration', 'Session', 'Time Slot', 'Invigilators']],
+              body: scheduleTableData,
+              theme: 'grid',
+              headStyles: { fillColor: [0, 165, 161], fontStyle: 'bold', fontSize: 8 },
+              styles: { fontSize: 7 },
+              columnStyles: {
+                0: { cellWidth: 22 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 }, 3: { cellWidth: 15 }, 4: { cellWidth: 15 },
+                5: { cellWidth: 15 }, 6: { cellWidth: 25 }, 7: { cellWidth: 'auto' }
+              }
+            });
+            
+            doc.addPage();
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text('Individual Invigilator Schedules', 14, 20);
+            
+            const invigilatorSchedules = {};
+            schedule.schedule.forEach(day => {
+              day.shifts.forEach(shift => {
+                shift.invigilators.forEach(invigilator => {
+                  if (!invigilatorSchedules[invigilator]) { invigilatorSchedules[invigilator] = []; }
+                  invigilatorSchedules[invigilator].push({
+                    date: day.date, subject: day.subject, venue: day.venue, shift: shift.shiftNumber,
+                    timeSlot: shift.startTime + ' - ' + shift.endTime
+                  });
+                });
+              });
+            });
+            
+            let currentY = 30;
+            Object.keys(invigilatorSchedules).sort().forEach((invigilator) => {
+              if (currentY > 180) {
+                doc.addPage();
+                currentY = 20;
+              }
+              
+              doc.setFontSize(12);
+              doc.setFont(undefined, 'bold');
+              doc.text(invigilator, 14, currentY);
+              currentY += 5;
+              
+              const invigilatorData = invigilatorSchedules[invigilator].map(slot => [
+                slot.date, slot.subject, slot.venue, 'Session ' + slot.shift, slot.timeSlot
+              ]);
+              
+              doc.autoTable({
+                startY: currentY,
+                head: [['Date', 'Subject', 'Venue', 'Session', 'Time Slot']],
+                body: invigilatorData,
+                theme: 'striped',
+                headStyles: { fillColor: [0, 165, 161], fontSize: 9 },
+                styles: { fontSize: 9 },
+                margin: { left: 20 },
+                columnStyles: {
+                  0: { cellWidth: 30 }, 1: { cellWidth: 50 }, 2: { cellWidth: 50 }, 3: { cellWidth: 20 }, 4: { cellWidth: 35 }
+                }
+              });
+              
+              currentY = doc.lastAutoTable.finalY + 10;
+            });
+            
+            doc.addPage('portrait');
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text('Invigilator Statistics', 14, 20);
+            
+            const statsData = schedule.stats.map(stat => [
+              stat.name, stat.availability + '%', stat.targetSlots, stat.assignedSlots, stat.difference
+            ]);
+            
+            doc.autoTable({
+              startY: 30,
+              head: [['Invigilator', 'Availability', 'Target Slots', 'Assigned', 'Difference']],
+              body: statsData,
+              theme: 'grid',
+              headStyles: { fillColor: [0, 165, 161], fontStyle: 'bold' },
+              styles: { fontSize: 9 }
+            });
+            
+            if (schedule.warnings && schedule.warnings.length > 0) {
+              doc.addPage();
+              doc.setFontSize(18);
+              doc.setFont(undefined, 'bold');
+              doc.setTextColor(184, 134, 11);
+              doc.text('⚠ Scheduling Warnings', 14, 20);
+              doc.setTextColor(0, 0, 0);
+              
+              doc.setFontSize(12);
+              let warningY = 35;
+              
+              if (schedule.backToBackCount > 0) {
+                doc.setFont(undefined, 'bold');
+                doc.text('Back-to-back sessions used: ' + schedule.backToBackCount, 14, warningY);
+                warningY += 10;
+                doc.setFont(undefined, 'normal');
+              }
+              
+              doc.setFontSize(10);
+              schedule.warnings.forEach((warning, index) => {
+                if (warningY > 270) {
+                  doc.addPage();
+                  warningY = 20;
+                }
+                doc.text('• ' + warning, 14, warningY);
+                warningY += 7;
+              });
+            }
+            
+            doc.save('invigilation-schedule.pdf');
+            showNotification('PDF schedule exported successfully!', 'success');
+          };
+
+          const exportConfigToExcel = () => {
+            const wb = XLSX.utils.book_new();
+            const invigilatorsData = [['Name', 'Availability %']];
+            invigilators.forEach(t => invigilatorsData.push([t.name, t.availability]));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(invigilatorsData), 'Invigilators');
+            
+            const daysData = [['Date', 'Subject', 'Venue', 'Grade', 'Start Time', 'Duration (hours)', 'Sessions', 'Invigilators Per Session', 'Excluded Invigilators']];
+            days.forEach(d => {
+              daysData.push([d.date, d.subject, d.venue, d.grade || '', d.startTime, d.duration, d.shifts, d.invigilatorsPerShift, d.excludedInvigilators.join('; ')]);
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(daysData), 'Days');
+            XLSX.writeFile(wb, 'invigilation-config.xlsx');
+            showNotification('Configuration exported successfully!', 'success');
+          };
+
+          const convertExcelTimeToString = (excelTime) => {
+            if (typeof excelTime === 'string' && excelTime.includes(':')) return excelTime;
+            if (typeof excelTime === 'number') {
+              const totalMinutes = Math.round(excelTime * 24 * 60);
+              const hours = Math.floor(totalMinutes / 60);
+              const minutes = totalMinutes % 60;
+              return hours.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0');
+            }
+            return '09:00';
+          };
+
+          const convertExcelDateToString = (excelDate) => {
+            if (typeof excelDate === 'string' && excelDate.includes('-')) return excelDate;
+            if (typeof excelDate === 'number') {
+              const date = new Date((excelDate - 25569) * 86400 * 1000);
+              return date.getFullYear() + '-' + 
+                     (date.getMonth() + 1).toString().padStart(2, '0') + '-' + 
+                     date.getDate().toString().padStart(2, '0');
+            }
+            return new Date().toISOString().split('T')[0];
+          };
+
+          const importFromExcel = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                if (workbook.SheetNames.includes('Invigilators')) {
+                  const invigilatorsData = XLSX.utils.sheet_to_json(workbook.Sheets['Invigilators']);
+                  const newInvigilators = invigilatorsData.map(row => ({
+                    name: String(row.Name || row.name || '').trim(),
+                    availability: Number(row['Availability %'] || row.Availability || 100)
+                  })).filter(t => t.name !== '');
+                  if (newInvigilators.length > 0) setInvigilators(newInvigilators);
+                }
+                if (workbook.SheetNames.includes('Days')) {
+                  const daysData = XLSX.utils.sheet_to_json(workbook.Sheets['Days']);
+                  const newDays = daysData.map(row => ({
+                    date: convertExcelDateToString(row.Date || row.date || ''),
+                    subject: String(row.Subject || row.subject || '').trim(),
+                    venue: String(row.Venue || row.venue || '').trim(),
+                    grade: String(row.Grade || row.grade || '').trim(),
+                    startTime: convertExcelTimeToString(row['Start Time'] || row.startTime || '09:00'),
+                    duration: parseFloat(row['Duration (hours)'] || row.duration || 2.5),
+                    shifts: Number(row.Sessions || row.sessions || 2),
+                    invigilatorsPerShift: Number(row['Invigilators Per Session'] || row.invigilatorsPerSession || 2),
+                    excludedInvigilators: row['Excluded Invigilators'] ? 
+                      String(row['Excluded Invigilators']).split(';').map(s => s.trim()).filter(s => s) : []
+                  })).filter(d => d.date.trim() !== '');
+                  if (newDays.length > 0) setDays(newDays);
+                }
+                
+                showNotification('Import successful!', 'success');
+                e.target.value = '';
+              } catch (error) {
+                showNotification('Error: ' + error.message, 'error');
+                e.target.value = '';
+              }
+            };
+            reader.readAsArrayBuffer(file);
+          };
+
+          return (
+            <div style={{ minHeight: '100vh', background: '#FFFFFF' }}>
+              <div className="header-bar">
+                <a href="index.html" className="btn-home">
+                  <span>←</span> Home
+                </a>
+                <div className="header-title-container">
+                  <img src="logo.png" alt="EduClickLab Logo" className="header-logo" />
+                  <h1 style={{ fontSize: '24px', fontWeight: '700', margin: 0 }}>Invigilation Scheduler</h1>
+                </div>
+                <div className="header-right">
+                  <span className="user-badge">{localStorage.getItem('currentUserEmail') || 'User'}</span>
+                  <span className="status-badge">AUTO-SAVING</span>
+                </div>
+              </div>
+
+              {/* Version Manager Bar */}
+              <div className="version-manager-bar">
+                <label>📋 Versions:</label>
+                <div className="version-tabs">
+                  {Object.values(versions).map(version => (
+                    <div
+                      key={version.id}
+                      className={`version-tab ${version.id === currentVersionId ? 'active' : ''}`}
+                      onClick={() => switchVersion(version.id)}
+                    >
+                      <span>{version.name}</span>
+                      {Object.keys(versions).length > 1 && (
+                        <span 
+                          className="version-tab-close"
+                          onClick={(e) => deleteVersion(version.id, e)}
+                        >
+                          ×
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button className="add-version-btn" onClick={openCreateVersionModal}>
+                  <span>➕</span> New Version
+                </button>
+                {currentVersionId && (
+                  <button className="btn-secondary" onClick={openRenameVersionModal} style={{ padding: '0.5rem 1rem' }}>
+                    ✏️ Rename
+                  </button>
+                )}
+              </div>
+
+              {/* Version Modal */}
+              {showVersionModal && (
+                <div className="modal-overlay" onClick={closeVersionModal}>
+                  <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-title">
+                      {versionModalAction === 'create' ? 'Create New Version' : 'Rename Version'}
+                    </div>
+                    <input
+                      className="modal-input"
+                      type="text"
+                      placeholder="Enter version name (e.g., 'Fall 2024', 'Midterms')"
+                      value={versionModalValue}
+                      onChange={(e) => setVersionModalValue(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleVersionModalSubmit();
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <div className="modal-buttons">
+                      <button className="btn-secondary" onClick={closeVersionModal}>
+                        Cancel
+                      </button>
+                      <button className="btn-primary" onClick={handleVersionModalSubmit}>
+                        {versionModalAction === 'create' ? 'Create' : 'Rename'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+                <div className="card">
+                  <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>Configuration</h2>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <label style={{ flex: '1', minWidth: '200px' }}>
+                      <div className="btn-primary" style={{ textAlign: 'center', cursor: 'pointer' }}>
+                        Import Excel
+                      </div>
+                      <input type="file" accept=".xlsx,.xls" onChange={importFromExcel} style={{ display: 'none' }} />
+                    </label>
+                    <button onClick={exportConfigToExcel} className="btn-primary" style={{ flex: '1', minWidth: '200px' }}>
+                      Export Config
+                    </button>
+                    <button onClick={clearForm} className="btn-secondary" style={{ flex: '1', minWidth: '200px' }}>
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+                  <div className="card">
+                    <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#000000' }}>Invigilators</h2>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                      <input
+                        type="text"
+                        placeholder="Invigilator name"
+                        value={newInvigilatorName}
+                        onChange={(e) => setNewInvigilatorName(e.target.value)}
+                        className="input-field"
+                        style={{ flex: 1 }}
+                      />
+                      <input
+                        type="number"
+                        value={newInvigilatorAvail}
+                        onChange={(e) => setNewInvigilatorAvail(Number(e.target.value))}
+                        className="input-field"
+                        style={{ width: '80px' }}
+                        min="0" max="100"
+                        placeholder="%"
+                      />
+                      <button onClick={addInvigilator} className="btn-primary">Add</button>
+                    </div>
+                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                      {invigilators.map((invigilator, index) => (
+                        <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', padding: '8px', background: '#F5F5F5', borderRadius: '8px' }}>
+                          <input
+                            type="text"
+                            value={invigilator.name}
+                            onChange={(e) => updateInvigilator(index, 'name', e.target.value)}
+                            className="input-field"
+                            style={{ flex: 1 }}
+                          />
+                          <input
+                            type="number"
+                            value={invigilator.availability}
+                            onChange={(e) => updateInvigilator(index, 'availability', e.target.value)}
+                            className="input-field"
+                            style={{ width: '60px' }}
+                          />
+                          <span style={{ fontSize: '12px', color: '#626567' }}>%</span>
+                          <button onClick={() => removeInvigilator(index)} style={{ background: 'none', border: 'none', color: '#626567', cursor: 'pointer', fontSize: '18px' }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#000000' }}>Invigilation Days</h2>
+                    <button onClick={addDay} className="btn-primary" style={{ width: '100%', marginBottom: '16px' }}>Add Day</button>
+                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                      {days.map((day, index) => (
+                        <div key={index} style={{ padding: '12px', background: '#F5F5F5', borderRadius: '12px', marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                            <div style={{ flex: 1 }}>
+                              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Date</label>
+                              <input
+                                type="date"
+                                value={day.date}
+                                onChange={(e) => updateDay(index, 'date', e.target.value)}
+                                className="input-field"
+                              />
+                            </div>
+                            <button onClick={() => removeDay(index)} style={{ background: 'none', border: 'none', color: '#626567', cursor: 'pointer', alignSelf: 'flex-end', paddingBottom: '10px' }}>×</button>
+                          </div>
+                          <div style={{ marginBottom: '8px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Subject</label>
+                            <input
+                              type="text"
+                              value={day.subject}
+                              onChange={(e) => updateDay(index, 'subject', e.target.value)}
+                              placeholder="e.g., Mathematics"
+                              className="input-field"
+                            />
+                          </div>
+                          <div style={{ marginBottom: '8px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Venue</label>
+                            <input
+                              type="text"
+                              value={day.venue}
+                              onChange={(e) => updateDay(index, 'venue', e.target.value)}
+                              placeholder="e.g., Hall A"
+                              className="input-field"
+                            />
+                          </div>
+                          <div style={{ marginBottom: '8px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Grade</label>
+                            <input
+                              type="text"
+                              value={day.grade || ''}
+                              onChange={(e) => updateDay(index, 'grade', e.target.value)}
+                              placeholder="e.g., Grade 12"
+                              className="input-field"
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Start Time</label>
+                              <input
+                                type="time"
+                                value={day.startTime}
+                                onChange={(e) => updateDay(index, 'startTime', e.target.value)}
+                                className="input-field"
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Duration (hours)</label>
+                              <input
+                                type="number"
+                                value={day.duration}
+                                onChange={(e) => updateDay(index, 'duration', e.target.value)}
+                                placeholder="2.5"
+                                className="input-field"
+                                step="0.5" min="0.5"
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                            <div>
+                              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Sessions</label>
+                              <input
+                                type="number"
+                                value={day.shifts}
+                                onChange={(e) => updateDay(index, 'shifts', e.target.value)}
+                                placeholder="2"
+                                className="input-field"
+                                min="1"
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px', color: '#000000' }}>Invigilators/Session</label>
+                              <input
+                                type="number"
+                                value={day.invigilatorsPerShift}
+                                onChange={(e) => updateDay(index, 'invigilatorsPerShift', e.target.value)}
+                                placeholder="2"
+                                className="input-field"
+                                min="1"
+                              />
+                            </div>
+                          </div>
+                          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #D1D3D4' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', display: 'block', marginBottom: '4px' }}>Exclude Invigilators:</label>
+                            <div style={{ maxHeight: '100px', overflowY: 'auto' }}>
+                              {invigilators.filter(t => t.availability > 0).map((invigilator, tIndex) => (
+                                <label key={tIndex} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', marginBottom: '4px', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={day.excludedInvigilators.includes(invigilator.name)}
+                                    onChange={() => toggleExcludedInvigilator(index, invigilator.name)}
+                                  />
+                                  <span>{invigilator.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card">
+                  <button onClick={generateSchedule} className="btn-primary" style={{ width: '100%', padding: '16px', fontSize: '18px' }}>
+                    Generate Schedule
+                  </button>
+                </div>
+
+                {schedule && (
+                  <div className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: '700' }}>Generated Schedule</h2>
+                        <button
+                          onClick={() => setScheduleCollapsed(!scheduleCollapsed)}
+                          style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#626567' }}
+                        >
+                          {scheduleCollapsed ? '▼' : '▲'}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => setViewMode('list')}
+                          className={viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}
+                        >
+                          List
+                        </button>
+                        <button
+                          onClick={() => setViewMode('calendar')}
+                          className={viewMode === 'calendar' ? 'btn-primary' : 'btn-secondary'}
+                        >
+                          Calendar
+                        </button>
+                        <button onClick={recheckWarnings} className="btn-secondary" style={{ background: '#ffa500' }}>
+                          Recheck Warnings
+                        </button>
+                        <button onClick={exportSchedule} className="btn-primary">Export Excel</button>
+                        <button onClick={exportToPDF} className="btn-primary">Export PDF</button>
+                        <button onClick={exportCalendarInvites} className="btn-primary"> Calendar Invites</button>
+                        <button onClick={exportScheduleJSON} className="btn-primary" style={{ background: '#FFA500' }}>
+                          📥 Download Schedule (JSON)
+                        </button>
+                        <label style={{ display: 'inline-block' }}>
+                          <div className="btn-primary" style={{ cursor: 'pointer', background: '#28A745', display: 'inline-block', padding: '12px 24px', borderRadius: '12px', fontWeight: '600', fontSize: '16px' }}>
+                            📤 Upload Schedule (JSON)
+                          </div>
+                          <input type="file" accept=".json" onChange={importScheduleJSON} style={{ display: 'none' }} />
+                        </label>
+                      </div>
+                    </div>
+
+                    {!scheduleCollapsed && (
+                      <>
+                    {schedule.warnings && schedule.warnings.length > 0 && (
+                      <div style={{ background: '#FFF3CD', padding: '16px', borderRadius: '12px', marginBottom: '24px', borderLeft: '4px solid #FFA500' }}>
+                        <h3 style={{ fontWeight: '600', marginBottom: '8px' }}>⚠️ Warnings</h3>
+                        {schedule.backToBackCount > 0 && (
+                          <p style={{ marginBottom: '8px' }}>Back-to-back: {schedule.backToBackCount}</p>
+                        )}
+                        {schedule.warnings.map((warning, i) => (
+                          <div key={i} style={{ fontSize: '13px', marginBottom: '4px' }}>• {warning}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {viewMode === 'list' && schedule.schedule.map((day, dayIndex) => (
+                      <div key={dayIndex} style={{ background: '#F5F5F5', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
+                        <h3 style={{ fontWeight: '600', fontSize: '16px', marginBottom: '8px' }}>
+                          {day.date} - {day.subject} @ {day.venue}
+                          {day.grade && <span style={{ background: '#667eea', color: '#FFFFFF', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', marginLeft: '8px' }}>{day.grade}</span>}
+                        </h3>
+                        <p style={{ color: '#626567', fontSize: '13px', marginBottom: '12px' }}>
+                          {day.startTime} ({day.duration}h)
+                        </p>
+                        {day.shifts.map((shift, shiftIndex) => (
+                          <div key={shiftIndex} style={{ background: '#FFFFFF', padding: '12px', borderRadius: '8px', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <strong>Session {shift.shiftNumber}:</strong>
+                              <span style={{ background: '#E8F4FD', padding: '8px', borderRadius: '6px', border: '1px solid #667eea', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                  type="time"
+                                  value={shift.startTime}
+                                  onChange={(e) => {
+                                    const newSchedule = JSON.parse(JSON.stringify(schedule));
+                                    newSchedule.schedule[dayIndex].shifts[shiftIndex].startTime = e.target.value;
+                                    setSchedule(newSchedule);
+                                  }}
+                                  style={{ 
+                                    border: '1px solid #ccc',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    width: '80px',
+                                    fontSize: '14px'
+                                  }}
+                                />
+                                <span>-</span>
+                                <input
+                                  type="time"
+                                  value={shift.endTime}
+                                  onChange={(e) => {
+                                    const newSchedule = JSON.parse(JSON.stringify(schedule));
+                                    newSchedule.schedule[dayIndex].shifts[shiftIndex].endTime = e.target.value;
+                                    setSchedule(newSchedule);
+                                  }}
+                                  style={{ 
+                                    border: '1px solid #ccc',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    width: '80px',
+                                    fontSize: '14px'
+                                  }}
+                                />
+                              </span>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+                                {shift.invigilators.map((invigilator, tIndex) => (
+                                  <span key={tIndex} className="tag">
+                                    {invigilator}
+                                    <button
+                                      onClick={() => removeInvigilatorFromSession(dayIndex, shiftIndex, invigilator)}
+                                      style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer', fontWeight: 'bold' }}
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
+                                <button
+                                  onClick={() => setEditingSession({ dayIndex, shiftIndex })}
+                                  style={{ background: '#D1D3D4', color: '#000', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                                >
+                                  + Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+
+                    {viewMode === 'calendar' && (() => {
+                      const calendarData = {};
+                      schedule.schedule.forEach(day => {
+                        if (!calendarData[day.date]) calendarData[day.date] = [];
+                        calendarData[day.date].push(day);
+                      });
+                      const dates = Object.keys(calendarData).sort();
+                      if (dates.length === 0) return null;
+                      const firstDate = new Date(dates[0]);
+                      const startOfMonth = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+                      const endOfMonth = new Date(firstDate.getFullYear(), firstDate.getMonth() + 1, 0);
+                      const startDay = startOfMonth.getDay();
+                      const totalDays = endOfMonth.getDate();
+                      const cells = [];
+                      for (let i = 0; i < startDay; i++) {
+                        cells.push(<div key={'e' + i} style={{ border: '1px solid #D1D3D4', minHeight: '100px', background: '#F5F5F5' }}></div>);
+                      }
+                      for (let day = 1; day <= totalDays; day++) {
+                        const dateStr = startOfMonth.getFullYear() + '-' + 
+                                       String(startOfMonth.getMonth() + 1).padStart(2, '0') + '-' + 
+                                       String(day).padStart(2, '0');
+                        const dayData = calendarData[dateStr];
+                        cells.push(
+                          <div key={day} style={{ border: '1px solid #D1D3D4', minHeight: '100px', padding: '8px', background: dayData ? '#E0F7F6' : '#FFFFFF' }}>
+                            <div style={{ fontWeight: '600', marginBottom: '4px' }}>{day}</div>
+                            {dayData && dayData.map((exam, idx) => (
+                              <div key={idx} style={{ background: '#667eea', color: '#FFFFFF', padding: '4px', borderRadius: '6px', fontSize: '11px', marginBottom: '4px' }}>
+                                <div style={{ fontWeight: '600' }}>{exam.subject}</div>
+                                <div>{exam.venue}</div>
+                                <div>{exam.startTime}</div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0', marginBottom: '4px' }}>
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                              <div key={d} style={{ textAlign: 'center', fontWeight: '600', padding: '8px' }}>{d}</div>
+                            ))}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0' }}>{cells}</div>
+                        </div>
+                      );
+                    })()}
+
+                    <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '2px solid #D1D3D4' }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>Invigilator Statistics</h3>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: '#F5F5F5' }}>
+                              <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #D1D3D4' }}>Invigilator</th>
+                              <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #D1D3D4' }}>Availability</th>
+                              <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #D1D3D4' }}>Target Slots</th>
+                              <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #D1D3D4' }}>Assigned</th>
+                              <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #D1D3D4' }}>Difference</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {schedule.stats.map((stat, index) => (
+                              <tr key={index} style={{ borderBottom: '1px solid #D1D3D4' }}>
+                                <td style={{ padding: '12px' }}>{stat.name}</td>
+                                <td style={{ padding: '12px', textAlign: 'center' }}>{stat.availability}%</td>
+                                <td style={{ padding: '12px', textAlign: 'center' }}>{stat.targetSlots}</td>
+                                <td style={{ padding: '12px', textAlign: 'center' }}>{stat.assignedSlots}</td>
+                                <td style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: Math.abs(parseFloat(stat.difference)) < 0.5 ? '#667eea' : '#FFA500' }}>
+                                  {stat.difference > 0 ? '+' : ''}{stat.difference}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    </>
+                    )}
+                  </div>
+                )}
+
+                {editingSession && (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div className="card" style={{ maxWidth: '400px', width: '90%', maxHeight: '80vh', overflowY: 'auto' }}>
+                      <h3 style={{ fontWeight: '600', marginBottom: '16px' }}>Add Invigilator</h3>
+                      {invigilators.filter(t => t.availability > 0).map((invigilator, idx) => {
+                        const isAssigned = schedule.schedule[editingSession.dayIndex].shifts[editingSession.shiftIndex].invigilators.includes(invigilator.name);
+                        const hasConflict = hasTimeConflict(invigilator.name, editingSession.dayIndex, editingSession.shiftIndex);
+                        
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => !isAssigned && addInvigilatorToSession(editingSession.dayIndex, editingSession.shiftIndex, invigilator.name)}
+                            disabled={isAssigned}
+                            style={{ 
+                              width: '100%', textAlign: 'left', padding: '12px', marginBottom: '8px',
+                              border: hasConflict ? '2px solid #FFA500' : '1px solid #D1D3D4', 
+                              borderRadius: '8px', 
+                              background: isAssigned ? '#E0E0E0' : hasConflict ? '#FFF8E1' : '#FFFFFF',
+                              cursor: isAssigned ? 'not-allowed' : 'pointer', 
+                              color: isAssigned ? '#999999' : hasConflict ? '#FF8C00' : '#000000',
+                              opacity: isAssigned ? 0.6 : 1,
+                              fontWeight: hasConflict ? '600' : '400'
+                            }}
+                          >
+                            {invigilator.name} 
+                            {isAssigned && ' (Already Assigned)'}
+                            {hasConflict && !isAssigned && ' ⚠️ (Time Conflict)'}
+                          </button>
+                        );
+                      })}
+                      <button onClick={() => setEditingSession(null)} className="btn-secondary" style={{ width: '100%', marginTop: '16px' }}>
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {confirmDialog && (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
+                    <div className="card" style={{ maxWidth: '400px', width: '90%' }}>
+                      <h3 style={{ fontWeight: '600', marginBottom: '16px', fontSize: '18px' }}>Confirm Action</h3>
+                      <p style={{ marginBottom: '24px', color: '#626567' }}>{confirmDialog.message}</p>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <button onClick={() => handleConfirm(false)} className="btn-secondary" style={{ flex: 1 }}>
+                          Cancel
+                        </button>
+                        <button onClick={() => handleConfirm(true)} className="btn-primary" style={{ flex: 1, background: '#DC3545' }}>
+                          Confirm
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ position: 'fixed', top: '80px', right: '24px', zIndex: 1002, display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px' }}>
+                  {notifications.map(notif => (
+                    <div
+                      key={notif.id}
+                      style={{
+                        background: notif.type === 'success' ? '#667eea' : notif.type === 'error' ? '#DC3545' : '#626567',
+                        color: '#FFFFFF',
+                        padding: '16px 20px',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        animation: 'slideIn 0.3s ease-out',
+                        fontWeight: '500'
+                      }}
+                    >
+                      {notif.message}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<InvigilationScheduler />);
+    </script>
+</body>
+</html>
