@@ -1,0 +1,26 @@
+{
+  "name": "edu-clicklab-tools",
+  "version": "1.0.0",
+  "description": "Education tools platform with Firebase authentication and data persistence",
+  "scripts": {
+    "deploy": "netlify deploy --prod",
+    "dev": "netlify dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR_USERNAME/edu-clicklab-tools.git"
+  },
+  "keywords": [
+    "education",
+    "exam",
+    "scheduling",
+    "seating-plan",
+    "firebase",
+    "netlify"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}
