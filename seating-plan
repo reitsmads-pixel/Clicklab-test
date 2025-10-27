@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Seating Plan Generator - Exam Roster</title>
+    <title> Seating Plan Generator - Exam Roster</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -2732,7 +2732,7 @@
             document.getElementById('modal').style.display = 'block';
         }
 
-        // Enhanced Local Storage
+        // Local Storage
         async function saveToLocalStorage() {
             localStorage.setItem('students', JSON.stringify(students));
             localStorage.setItem('venues', JSON.stringify(venues));
