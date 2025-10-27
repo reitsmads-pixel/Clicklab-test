@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edu ClickLab - Education Tools</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        /* Authentication Modal */
+        .auth-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 400px;
+            margin: 0 auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .auth-modal h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #667eea;
+            font-size: 32px;
+        }
+
+        .auth-modal .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-auth {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .btn-auth:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-auth:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .auth-toggle a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            display: none;
+        }
+
+        /* Main Dashboard */
+        .dashboard {
+            display: none;
+        }
+
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 32px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-email {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .btn-logout {
+            padding: 10px 20px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: #d32f2f;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .tool-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .tool-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .tool-card h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .tool-card p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .tool-card.invigilation {
+            border-top: 4px solid #00A5A1;
+        }
+
+        .tool-card.seating {
+            border-top: 4px solid #FFA500;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+
+            .tools-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Logo Styles */
+        .logo {
+            max-width: 300px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+
+        .header-logo {
+            max-width: 300px;
+            height: auto;
+        }
+
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Authentication View -->
+        <div id="authView" class="auth-view">
+            <div class="auth-modal">
+                <div class="logo-container">
+                    <img src="logo.png" alt="EduClickLab Logo" class="logo">
+                </div>
+                <p class="subtitle">Professional Education Tools</p>
+                
+                <div class="error-message" id="errorMessage"></div>
+
+                <form id="authForm">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" required placeholder="your.email@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" required placeholder="••••••••" minlength="6">
+                    </div>
+                    <button type="submit" class="btn-auth" id="authButton">Sign In</button>
+                </form>
+
+                <div class="auth-toggle">
+                    <span id="toggleText">Don't have an account?</span>
+                    <a id="toggleLink">Sign Up</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboardView" class="dashboard">
+            <div class="header">
+                <div>
+                    <img src="logo.png" alt="EduClickLab Logo" class="header-logo" style="margin-bottom: 10px;">
+                </div>
+                <div class="user-info">
+                    <span class="user-email" id="userEmail"></span>
+                    <button class="btn-logout" id="logoutBtn">Logout</button>
+                </div>
+            </div>
+
+            <div class="tools-grid">
+                <a href="invigilation-scheduler.html" class="tool-card invigilation">
+                    <div class="tool-icon">👥</div>
+                    <h2>Invigilation Scheduler</h2>
+                    <p>Create and manage exam invigilation schedules. Assign invigilators, set time slots, and generate comprehensive reports with ease.</p>
+                </a>
+
+                <a href="seating-plan.html" class="tool-card seating">
+                    <div class="tool-icon">🪑</div>
+                    <h2>Seating Plan Generator</h2>
+                    <p>Generate optimized seating arrangements for exams. Manage multiple sessions, import student data, and export detailed seating charts.</p>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDk0WZdFVImwinLFNYj8SSghLcxC_SDAp8",
+            authDomain: "edu-clicklab.firebaseapp.com",
+            projectId: "edu-clicklab",
+            storageBucket: "edu-clicklab.firebasestorage.app",
+            messagingSenderId: "1029624910209",
+            appId: "1:1029624910209:web:20a3b9664fca69b7b21880",
+            measurementId: "G-6DMZ7QTWGM"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // DOM Elements
+        const authView = document.getElementById('authView');
+        const dashboardView = document.getElementById('dashboardView');
+        const authForm = document.getElementById('authForm');
+        const authButton = document.getElementById('authButton');
+        const toggleLink = document.getElementById('toggleLink');
+        const toggleText = document.getElementById('toggleText');
+        const errorMessage = document.getElementById('errorMessage');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userEmailDisplay = document.getElementById('userEmail');
+
+        let isSignUp = false;
+
+        // Toggle between Sign In and Sign Up
+        toggleLink.addEventListener('click', () => {
+            isSignUp = !isSignUp;
+            if (isSignUp) {
+                authButton.textContent = 'Sign Up';
+                toggleText.textContent = 'Already have an account?';
+                toggleLink.textContent = 'Sign In';
+            } else {
+                authButton.textContent = 'Sign In';
+                toggleText.textContent = "Don't have an account?";
+                toggleLink.textContent = 'Sign Up';
+            }
+            hideError();
+        });
+
+        // Show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Handle form submission
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            authButton.disabled = true;
+            authButton.textContent = isSignUp ? 'Creating Account...' : 'Signing In...';
+
+            try {
+                if (isSignUp) {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (error) {
+                console.error('Auth error:', error);
+                let errorMsg = 'An error occurred. Please try again.';
+                
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        errorMsg = 'This email is already registered. Please sign in.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMsg = 'Invalid email address.';
+                        break;
+                    case 'auth/weak-password':
+                        errorMsg = 'Password should be at least 6 characters.';
+                        break;
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                        errorMsg = 'Invalid email or password.';
+                        break;
+                    case 'auth/invalid-credential':
+                        errorMsg = 'Invalid email or password.';
+                        break;
+                }
+                
+                showError(errorMsg);
+                authButton.disabled = false;
+                authButton.textContent = isSignUp ? 'Sign Up' : 'Sign In';
+            }
+        });
+
+        // Handle logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Error logging out. Please try again.');
+            }
+        });
+
+        // Listen for auth state changes
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                authView.style.display = 'none';
+                dashboardView.style.display = 'block';
+                userEmailDisplay.textContent = user.email;
+                
+                // Store user ID for other pages
+                localStorage.setItem('currentUserId', user.uid);
+                localStorage.setItem('currentUserEmail', user.email);
+            } else {
+                // User is signed out
+                authView.style.display = 'block';
+                dashboardView.style.display = 'none';
+                authForm.reset();
+                authButton.disabled = false;
+                authButton.textContent = 'Sign In';
+                
+                // Clear stored user data
+                localStorage.removeItem('currentUserId');
+                localStorage.removeItem('currentUserEmail');
+            }
+        });
+    </script>
+</body>
+</html>
